@@ -11,6 +11,8 @@ import { apiRateLimiter } from './middleware/rateLimit';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth.routes';
 import messagesRoutes from './routes/messages.routes';
+import usersRoutes from './routes/users.routes';
+import adminRoutes from './routes/admin.routes';
 
 export function buildSessionMiddleware(): RequestHandler {
   return session({
@@ -57,6 +59,8 @@ export function createApp(sessionMiddleware: RequestHandler): Express {
   app.use('/api', apiRateLimiter);
   app.use('/api/auth', authRoutes);
   app.use('/api/messages', messagesRoutes);
+  app.use('/api/users', usersRoutes);
+  app.use('/api/admin', adminRoutes);
 
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });

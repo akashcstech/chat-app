@@ -17,28 +17,30 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Redirect if already logged in
   useEffect(() => {
-    if (getSession()) navigate({ to: "/chat" });
+    getSession().then((user) => {
+      if (user) navigate({ to: "/chat" });
+    });
   }, [navigate]);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
-    window.setTimeout(() => {
-      const user = login(identifier, password);
-      setBusy(false);
-      if (!user) {
-        setError("Invalid email or password.");
-        return;
-      }
+    try {
+      await login(email.trim(), password);
       navigate({ to: "/chat" });
-    }, 350);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid email or password.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -57,15 +59,15 @@ function LoginPage() {
           className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm"
         >
           <div className="space-y-1.5">
-            <label htmlFor="identifier" className="text-sm font-medium">
+            <label htmlFor="email" className="text-sm font-medium">
               Email
             </label>
             <input
-              id="identifier"
-              type="text"
+              id="email"
+              type="email"
               autoComplete="username"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
               required
@@ -95,18 +97,13 @@ function LoginPage() {
 
           <button
             type="submit"
+            id="login-submit"
             disabled={busy}
             className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
           >
             {busy ? "Signing in…" : "Login"}
           </button>
         </form>
-
-        <div className="mt-6 rounded-xl border border-dashed border-border p-4 text-xs leading-relaxed text-muted-foreground">
-          <p className="font-medium text-foreground">Demo accounts (frontend only)</p>
-          <p>aarav@example.com / password1</p>
-          <p>meera@example.com / password2</p>
-        </div>
       </div>
     </main>
   );
