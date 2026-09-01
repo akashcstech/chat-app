@@ -1,5 +1,10 @@
+import dns from 'dns';
 import mongoose from 'mongoose';
 import { env } from '../config/env';
+
+// The system DNS resolver (127.0.0.1) may not resolve MongoDB Atlas SRV records.
+// Override to use reliable public resolvers before any network activity.
+dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
 
 let connected = false;
 

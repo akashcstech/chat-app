@@ -36,7 +36,6 @@ export function buildSessionMiddleware(): RequestHandler {
       client: mongoose.connection.getClient() as never,
       ttl: env.sessionTtlMs / 1000,
       touchAfter: 60, // seconds — avoid writing to the store on every request
-      crypto: { secret: env.sessionSecret },
     }),
     cookie: {
       httpOnly: true,

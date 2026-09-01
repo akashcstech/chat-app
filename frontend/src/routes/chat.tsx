@@ -156,14 +156,15 @@ function ChatPage() {
   }, [nextCursor, loadingOlder]);
 
   // ── Send ─────────────────────────────────────────────────────────────────
+  // NOTE: No optimistic add here. The server broadcasts `message:new` back to
+  // the sender via Socket.IO, so the message appears exactly once through the
+  // socket handler above (which already deduplicates by id).
   async function handleSend(content: string) {
     if (!user) return;
     setError(null);
+    atBottomRef.current = true;
     try {
-      const msg = await sendMessage(content);
-      atBottomRef.current = true;
-      // Optimistic add — socket event will be de-duped
-      setMessages((m) => [...m, msg]);
+      await sendMessage(content);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to send message.");
     }
