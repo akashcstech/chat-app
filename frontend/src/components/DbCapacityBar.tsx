@@ -111,28 +111,30 @@ export function DbCapacityBar({ currentUser, onReset }: Props) {
         </div>
 
         {/* Export button — backend enforces User 2 restriction */}
-        <button
-          id="export-reset-btn"
-          onClick={handleExport}
-          disabled={exporting}
-          title="Export all messages to CSV and reset the database (Admin only)"
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition",
-            isCritical
-              ? "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20"
-              : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground",
-            "disabled:opacity-60",
-          )}
-        >
-          {exporting ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : exportDone ? (
-            <CheckCircle2 className="size-3 text-chart-2" />
-          ) : (
-            <Download className="size-3" />
-          )}
-          {exporting ? "Exporting…" : exportDone ? "Done!" : "Export & Reset"}
-        </button>
+        {currentUser.isAdmin && (
+          <button
+            id="export-reset-btn"
+            onClick={handleExport}
+            disabled={exporting}
+            title="Export all messages to CSV and reset the database (Admin only)"
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition",
+              isCritical
+                ? "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20"
+                : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground",
+              "disabled:opacity-60",
+            )}
+          >
+            {exporting ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : exportDone ? (
+              <CheckCircle2 className="size-3 text-chart-2" />
+            ) : (
+              <Download className="size-3" />
+            )}
+            {exporting ? "Exporting…" : exportDone ? "Done!" : "Export & Reset"}
+          </button>
+        )}
       </div>
 
       {/* Progress bar */}

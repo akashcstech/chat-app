@@ -14,7 +14,7 @@
 import { apiFetch, clearCsrfToken, setCsrfToken } from './api';
 
 // ── Shared types ────────────────────────────────────────────────────────────
-export type ChatUser = { id: string; name: string; email: string };
+export type ChatUser = { id: string; name: string; email: string; isAdmin?: boolean };
 
 export type Message = {
   id: string;
@@ -53,11 +53,11 @@ function clearCache() {
 }
 
 // ── Backend response shapes ─────────────────────────────────────────────────
-type BackendUser = { id: string; username: string; email: string };
+type BackendUser = { id: string; username: string; email: string; isAdmin?: boolean };
 type AuthResponse = { user: BackendUser; csrfToken: string };
 
 function mapUser(u: BackendUser): ChatUser {
-  return { id: u.id, name: u.username, email: u.email };
+  return { id: u.id, name: u.username, email: u.email, isAdmin: u.isAdmin };
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────

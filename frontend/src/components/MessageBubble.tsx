@@ -7,7 +7,7 @@ export function MessageBubble({ message, mine }: { message: Message; mine: boole
     <div className={cn("flex w-full", mine ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm sm:max-w-[65%]",
+          "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm sm:max-w-[65%] select-none",
           mine
             ? "rounded-br-md bg-primary text-primary-foreground"
             : "rounded-bl-md bg-card text-card-foreground border border-border",

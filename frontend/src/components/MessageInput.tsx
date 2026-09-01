@@ -29,6 +29,9 @@ export function MessageInput({ onSend }: { onSend: (content: string) => void }) 
               submit();
             }
           }}
+          onPaste={(e) => e.preventDefault()}
+          onCopy={(e) => e.preventDefault()}
+          onCut={(e) => e.preventDefault()}
           placeholder="Type a message…"
           aria-label="Message"
           className="max-h-40 min-h-[42px] flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"

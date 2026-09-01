@@ -4,6 +4,7 @@ import { verifyPassword } from '../utils/password';
 import { loginSchema } from '../utils/validation';
 import { generateCsrfToken } from '../middleware/csrf';
 import { HttpError } from '../middleware/errorHandler';
+import { env } from '../config/env';
 
 const GENERIC_INVALID_CREDENTIALS = 'Invalid email or password';
 
@@ -41,7 +42,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       req.session.save((saveErr) => {
         if (saveErr) return next(saveErr);
         res.status(200).json({
-          user: { id: user._id.toString(), username: user.username, email: user.email },
+          user: { id: user._id.toString(), username: user.username, email: user.email, isAdmin: user.email.toLowerCase() === env.users.user2.email.toLowerCase() },
           csrfToken: req.session.csrfToken,
         });
       });
@@ -70,7 +71,7 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
       throw new HttpError(401, 'Unauthorized');
     }
     res.status(200).json({
-      user: { id: user._id.toString(), username: user.username, email: user.email },
+      user: { id: user._id.toString(), username: user.username, email: user.email, isAdmin: user.email.toLowerCase() === env.users.user2.email.toLowerCase() },
       csrfToken: req.session.csrfToken,
     });
   } catch (err) {
