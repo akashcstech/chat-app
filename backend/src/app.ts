@@ -7,6 +7,15 @@ import MongoStore from 'connect-mongo';
 import mongoSanitize from 'express-mongo-sanitize';
 import mongoose from 'mongoose';
 import { env } from './config/env';
+
+// Augment express-session inline so ts-node always sees it regardless of
+// how it discovers ambient declaration files.
+declare module 'express-session' {
+  interface SessionData {
+    userId?: string;
+    csrfToken?: string;
+  }
+}
 import { apiRateLimiter } from './middleware/rateLimit';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth.routes';
