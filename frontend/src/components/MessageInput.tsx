@@ -12,7 +12,19 @@ export function MessageInput({ onSend }: { onSend: (content: string) => void }) 
     if (!canSend) return;
     onSend(value.trim());
     setValue("");
+    // Reset height after clearing
+    if (ref.current) {
+      ref.current.style.height = "auto";
+    }
     ref.current?.focus();
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setValue(e.target.value);
+    // Auto-resize: reset then expand to fit content
+    const el = e.target;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
   }
 
   return (
@@ -22,7 +34,7 @@ export function MessageInput({ onSend }: { onSend: (content: string) => void }) 
           ref={ref}
           rows={1}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={handleChange}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -34,7 +46,7 @@ export function MessageInput({ onSend }: { onSend: (content: string) => void }) 
           onCut={(e) => e.preventDefault()}
           placeholder="Type a message…"
           aria-label="Message"
-          className="max-h-40 min-h-[42px] flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
+          className="max-h-40 min-h-[42px] flex-1 resize-none overflow-y-auto rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
         />
         <button
           type="button"

@@ -4,7 +4,7 @@
  * - Automatically attaches the CSRF token for mutating requests
  */
 
-const BACKEND_URL = 'http://localhost:4000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4000';
 const CSRF_KEY = 'pc.csrf';
 
 // In-memory CSRF token (populated after login / me)

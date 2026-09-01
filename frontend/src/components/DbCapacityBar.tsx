@@ -33,8 +33,22 @@ export function DbCapacityBar({ currentUser, onReset }: Props) {
   useEffect(() => {
     fetchStats();
     timerRef.current = setInterval(fetchStats, POLL_INTERVAL_MS);
+
+    // Pause polling while the tab is hidden — resume + refresh when visible again.
+    function handleVisibility() {
+      if (document.hidden) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = null;
+      } else {
+        fetchStats();
+        timerRef.current = setInterval(fetchStats, POLL_INTERVAL_MS);
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [fetchStats]);
 

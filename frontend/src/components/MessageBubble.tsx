@@ -1,8 +1,15 @@
+import { memo } from "react";
 import { Check, CheckCheck } from "lucide-react";
 import { formatTime, type Message } from "@/lib/chat-store";
 import { cn } from "@/lib/utils";
 
-export function MessageBubble({ message, mine }: { message: Message; mine: boolean }) {
+export const MessageBubble = memo(function MessageBubble({
+  message,
+  mine,
+}: {
+  message: Message;
+  mine: boolean;
+}) {
   return (
     <div className={cn("flex w-full", mine ? "justify-end" : "justify-start")}>
       <div
@@ -34,4 +41,4 @@ export function MessageBubble({ message, mine }: { message: Message; mine: boole
       </div>
     </div>
   );
-}
+});

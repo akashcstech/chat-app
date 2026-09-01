@@ -24,7 +24,9 @@ export const Route = createFileRoute("/")({
 function Index() {
   const navigate = useNavigate();
   useEffect(() => {
-    navigate({ to: getSession() ? "/chat" : "/login", replace: true });
+    getSession().then((user) => {
+      navigate({ to: user ? "/chat" : "/login", replace: true });
+    });
   }, [navigate]);
 
   return (
