@@ -121,6 +121,34 @@ describe('Messages', () => {
 
       expect(res.status).toBe(201);
     });
+
+    it('returns 403 when the max message limit is reached', async () => {
+      const agent = supertest.agent(app);
+      const csrf = await loginAs(agent, env.users.user1.email, env.users.user1.password);
+      
+      const { Meta, MESSAGE_COUNTER_KEY } = await import('../src/models/Meta');
+      const originalMax = process.env.MAX_MESSAGES;
+      
+      try {
+        process.env.MAX_MESSAGES = '10';
+        await Meta.updateOne(
+          { key: MESSAGE_COUNTER_KEY },
+          { $set: { messageCount: 10 } },
+          { upsert: true }
+        );
+
+        const res = await agent
+          .post('/api/messages')
+          .set('X-CSRF-Token', csrf)
+          .send({ content: 'Should be blocked' });
+
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain('limit reached');
+      } finally {
+        process.env.MAX_MESSAGES = originalMax;
+        await Meta.deleteOne({ key: MESSAGE_COUNTER_KEY });
+      }
+    });
   });
 
   // ─────────────────────── GET MESSAGES ───────────────────────

@@ -2,21 +2,28 @@ import { useRef, useState } from "react";
 import { SendHorizontal } from "lucide-react";
 import { MAX_LENGTH } from "@/lib/chat-store";
 
-export function MessageInput({ onSend }: { onSend: (content: string) => void }) {
+export function MessageInput({ onSend, isCapReached = false }: { onSend: (content: string) => void | Promise<void>, isCapReached?: boolean }) {
   const [value, setValue] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const sendingRef = useRef(false);
   const tooLong = value.length > MAX_LENGTH;
-  const canSend = value.trim().length > 0 && !tooLong;
+  const canSend = value.trim().length > 0 && !tooLong && !isCapReached;
 
-  function submit() {
-    if (!canSend) return;
-    onSend(value.trim());
+  async function submit() {
+    if (!canSend || sendingRef.current) return;
+    sendingRef.current = true;
+    const text = value.trim();
     setValue("");
     // Reset height after clearing
     if (ref.current) {
       ref.current.style.height = "auto";
     }
-    ref.current?.focus();
+    try {
+      await onSend(text);
+    } finally {
+      sendingRef.current = false;
+      ref.current?.focus();
+    }
   }
 
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -35,6 +42,7 @@ export function MessageInput({ onSend }: { onSend: (content: string) => void }) 
           rows={1}
           value={value}
           onChange={handleChange}
+          disabled={isCapReached}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -44,7 +52,7 @@ export function MessageInput({ onSend }: { onSend: (content: string) => void }) 
           onPaste={(e) => e.preventDefault()}
           onCopy={(e) => e.preventDefault()}
           onCut={(e) => e.preventDefault()}
-          placeholder="Type a message…"
+          placeholder={isCapReached ? "Message limit reached." : "Type a message…"}
           aria-label="Message"
           className="max-h-40 min-h-[42px] flex-1 resize-none overflow-y-auto rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
         />
@@ -58,9 +66,14 @@ export function MessageInput({ onSend }: { onSend: (content: string) => void }) 
           <span className="hidden sm:inline">Send</span>
         </button>
       </div>
-      {tooLong && (
+      {tooLong && !isCapReached && (
         <p className="mx-auto mt-2 max-w-3xl text-xs text-destructive">
           Message is too long ({value.length}/{MAX_LENGTH}).
+        </p>
+      )}
+      {isCapReached && (
+        <p className="mx-auto mt-2 max-w-3xl text-sm text-destructive font-medium text-center bg-destructive/10 py-1.5 rounded-md">
+          Message limit reached. Please ask the administrator to export and reset the database.
         </p>
       )}
     </div>

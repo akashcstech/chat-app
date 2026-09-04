@@ -11,7 +11,7 @@
  *   POST   /api/messages
  */
 
-import { apiFetch, clearCsrfToken, setCsrfToken } from './api';
+import { apiFetch, clearCsrfToken, setCsrfToken, getCsrfToken, BACKEND_URL } from './api';
 
 // ── Shared types ────────────────────────────────────────────────────────────
 export type ChatUser = { id: string; name: string; email: string; isAdmin?: boolean };
@@ -113,7 +113,7 @@ export async function getPeerUser(): Promise<ChatUser | null> {
 }
 
 // ── Messages ────────────────────────────────────────────────────────────────
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 20;
 export const MAX_LENGTH = 2000;
 
 type BackendMessage = {
@@ -190,20 +190,18 @@ export async function getDbStats(): Promise<{ messageCount: number; cap: number 
  * the server has already wiped the database by then.
  */
 export async function exportAndReset(): Promise<void> {
-  const res = await fetch('http://localhost:4000/api/admin/export-and-reset', {
+  const csrfToken = getCsrfToken();
+  const res = await fetch(`${BACKEND_URL}/api/admin/export-and-reset`, {
     method: 'POST',
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
-      ...(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pc.csrf')
-        ? { 'X-CSRF-Token': sessionStorage.getItem('pc.csrf')! }
-        : {}),
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { message?: string };
-    throw new Error(body.message ?? `Export failed: HTTP ${res.status}`);
+    const body = await res.json().catch(() => ({})) as { error?: string; message?: string };
+    throw new Error(body.error ?? body.message ?? `Export failed: HTTP ${res.status}`);
   }
 
   // Stream the CSV blob and trigger a browser download

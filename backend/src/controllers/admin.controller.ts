@@ -31,18 +31,25 @@ export async function getStats(
  * POST /api/admin/export-and-reset
  *
  * ADMIN ONLY (User 2 resolved from env):
- *  1. Streams all messages as a CSV download.
+ *  1. Streams all messages as a CSV download via a Mongoose cursor so the
+ *     entire collection is never loaded into memory at once.
  *  2. Only after the entire CSV has been flushed does it wipe the DB and
  *     reset the counter.
  *
- * The "export-then-wipe" is sequential and within a single HTTP response so
- * the client receives complete data before the deletion is committed.
+ * Streaming strategy:
+ *  - We open a Mongoose QueryCursor on the Message collection.
+ *  - We pre-fetch both user documents once (2 DB round trips total, not 2N).
+ *  - Each batch of BATCH_SIZE documents is serialised to CSV and written to
+ *    the response, keeping peak memory proportional to BATCH_SIZE rather
+ *    than to the total number of messages.
  */
 export async function exportAndReset(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  const BATCH_SIZE = 500;
+
   try {
     // ── Guard: User 2 only ────────────────────────────────────────────────
     const currentUser = await User.findById(req.session.userId as string);
@@ -53,52 +60,88 @@ export async function exportAndReset(
       throw new HttpError(403, 'This action is restricted to the administrator account.');
     }
 
-    // ── Fetch all messages with sender / receiver info ────────────────────
-    const messages = await Message.find({})
-      .sort({ createdAt: 1 })
-      .populate<{ senderId: { username: string; email: string } }>('senderId', 'username email')
-      .populate<{ receiverId: { username: string; email: string } }>('receiverId', 'username email')
-      .lean();
+    // ── Pre-fetch both users once (2 queries, not 2 per message) ─────────
+    const allUsers = await User.find({}, { _id: 1, username: 1, email: 1 }).lean();
+    const userMap = new Map(allUsers.map((u) => [u._id.toString(), u]));
 
-    // ── Build CSV ─────────────────────────────────────────────────────────
+    // ── Build CSV stringifier ─────────────────────────────────────────────
     const csvStringifier = createObjectCsvStringifier({
       header: [
-        { id: 'id', title: 'ID' },
-        { id: 'senderEmail', title: 'Sender Email' },
-        { id: 'senderUsername', title: 'Sender Username' },
-        { id: 'receiverEmail', title: 'Receiver Email' },
-        { id: 'content', title: 'Content' },
-        { id: 'createdAt', title: 'Created At' },
+        { id: 'id',              title: 'ID' },
+        { id: 'senderEmail',     title: 'Sender Email' },
+        { id: 'senderUsername',  title: 'Sender Username' },
+        { id: 'receiverEmail',   title: 'Receiver Email' },
+        { id: 'content',         title: 'Content' },
+        { id: 'createdAt',       title: 'Created At' },
       ],
     });
 
-    const records = messages.map((m) => {
-      const sender = m.senderId as unknown as { username: string; email: string };
-      const receiver = m.receiverId as unknown as { username: string; email: string };
-      return {
-        id: m._id.toString(),
-        senderEmail: sender?.email ?? '',
-        senderUsername: sender?.username ?? '',
-        receiverEmail: receiver?.email ?? '',
-        content: m.content,
-        createdAt: m.createdAt.toISOString(),
-      };
-    });
-
-    const csvBody =
-      csvStringifier.getHeaderString() + csvStringifier.stringifyRecords(records);
-
-    // ── Send CSV headers & body ───────────────────────────────────────────
+    // ── Send CSV headers ──────────────────────────────────────────────────
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="chat-export-${timestamp}.csv"`,
     );
-    res.setHeader('Content-Length', Buffer.byteLength(csvBody, 'utf8'));
+    // Tell compression middleware to skip this response — we are streaming raw
+    // bytes and compressing a chunked transfer adds complexity without benefit.
+    res.setHeader('Cache-Control', 'no-transform');
+    // Node.js sets Transfer-Encoding: chunked automatically for streaming
+    // responses. Setting it explicitly can confuse some middleware stacks.
 
-    // Write CSV and wait for the socket to flush before wiping.
-    res.write(csvBody);
+    // Write CSV header row first.
+    res.write(csvStringifier.getHeaderString());
+
+    // ── Stream messages in batches ────────────────────────────────────────
+    const cursor = Message.find({})
+      .sort({ createdAt: 1 })
+      .select({ senderId: 1, receiverId: 1, content: 1, createdAt: 1 })
+      .lean()
+      .cursor({ batchSize: BATCH_SIZE });
+
+    let batch: {
+      id: string;
+      senderEmail: string;
+      senderUsername: string;
+      receiverEmail: string;
+      content: string;
+      createdAt: string;
+    }[] = [];
+
+    try {
+      for await (const msg of cursor) {
+        const sender   = userMap.get(msg.senderId.toString());
+        const receiver = userMap.get(msg.receiverId.toString());
+
+        batch.push({
+          id:              msg._id.toString(),
+          senderEmail:     sender?.email     ?? '',
+          senderUsername:  sender?.username  ?? '',
+          receiverEmail:   receiver?.email   ?? '',
+          content:         msg.content,
+          createdAt:       new Date(msg.createdAt).toISOString(),
+        });
+
+        if (batch.length >= BATCH_SIZE) {
+          res.write(csvStringifier.stringifyRecords(batch));
+          batch = [];
+        }
+      }
+
+      // Flush any remaining records.
+      if (batch.length > 0) {
+        res.write(csvStringifier.stringifyRecords(batch));
+      }
+    } catch (streamErr) {
+      // An error mid-stream: headers are already sent so we can't return an
+      // HTTP error code. End the connection cleanly and log, then bail out
+      // WITHOUT wiping the database — data is still safe.
+      console.error('[export] streaming error — aborting, DB untouched:', streamErr);
+      res.end();
+      return;
+    }
+
+    // Wait for the socket to fully flush before wiping data.
     await new Promise<void>((resolve) => res.end(resolve));
 
     // ── Wipe messages & reset counter ─────────────────────────────────────

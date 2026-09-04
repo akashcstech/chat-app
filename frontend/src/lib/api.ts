@@ -4,12 +4,16 @@
  * - Automatically attaches the CSRF token for mutating requests
  */
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4000';
+export const BACKEND_URL = import.meta.env['VITE_BACKEND_URL'] ?? 'http://localhost:4000';
 const CSRF_KEY = 'pc.csrf';
 
 // In-memory CSRF token (populated after login / me)
 let _csrfToken: string | null =
   typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(CSRF_KEY) : null;
+
+export function getCsrfToken(): string | null {
+  return _csrfToken;
+}
 
 export function setCsrfToken(token: string) {
   _csrfToken = token;

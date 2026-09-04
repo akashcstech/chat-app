@@ -1,6 +1,8 @@
 import express, { Express, RequestHandler } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
+import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
@@ -14,6 +16,7 @@ declare module 'express-session' {
   interface SessionData {
     userId?: string;
     csrfToken?: string;
+    peerId?: string; // cached peer user ID — resolved once on first use, stored for the session lifetime
   }
 }
 import { apiRateLimiter } from './middleware/rateLimit';
@@ -40,7 +43,7 @@ export function buildSessionMiddleware(): RequestHandler {
     cookie: {
       httpOnly: true,
       secure: env.isProduction, // requires HTTPS in production
-      sameSite: 'lax', // CSRF mitigation for cross-site requests
+      sameSite: 'strict', // strongest CSRF mitigation — safe for a private 2-person app
       maxAge: env.sessionTtlMs,
     },
   });
@@ -59,6 +62,17 @@ export function createApp(sessionMiddleware: RequestHandler): Express {
       credentials: true,
     })
   );
+
+  // Compress all responses — meaningful for JSON payloads and especially
+  // for the CSV export which can be hundreds of megabytes uncompressed.
+  app.use(compression());
+
+  // HTTP request logger — dev only; production logging belongs in the
+  // infra layer (Vercel/Nginx access logs).
+  if (!env.isProduction) {
+    app.use(morgan('dev'));
+  }
+
   app.use(express.json({ limit: '32kb' })); // small cap; messages are short text
   app.use(cookieParser());
   app.use(sessionMiddleware);

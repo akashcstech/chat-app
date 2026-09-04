@@ -12,7 +12,7 @@ export async function getPeer(req: Request, res: Response, next: NextFunction): 
     if (!req.session.userId) {
       throw new HttpError(401, 'Unauthorized');
     }
-    const peer = await getOtherUser(req.session.userId);
+    const peer = await getOtherUser(req.session.userId, req.session);
     res.status(200).json({
       user: {
         id: peer._id.toString(),

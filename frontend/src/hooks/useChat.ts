@@ -13,6 +13,7 @@ import {
   getMessages,
   logout,
   sendMessage,
+  getDbStats,
   type ChatUser,
   type Message,
 } from "@/lib/chat-store";
@@ -31,6 +32,7 @@ export function useChat() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [isCapReached, setIsCapReached] = useState(false);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -47,6 +49,16 @@ export function useChat() {
   useEffect(() => { loadingOlderRef.current = loadingOlder; }, [loadingOlder]);
 
   // ── Bootstrap: verify session, load peer & first message page ─────────────
+  
+  const refreshStats = useCallback(async () => {
+    try {
+      const stats = await getDbStats();
+      setIsCapReached(stats.messageCount >= stats.cap);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     async function bootstrap() {
@@ -58,7 +70,8 @@ export function useChat() {
         }
         const [peerUser, page] = await Promise.all([
           getPeerUser(),
-          getMessages({ limit: 50 }),
+          getMessages(),
+          refreshStats(),
         ]);
         if (cancelled) return;
         setUser(session);
@@ -73,7 +86,7 @@ export function useChat() {
     }
     bootstrap();
     return () => { cancelled = true; };
-  }, [navigate]);
+  }, [navigate, refreshStats]);
 
   // ── Socket.IO — connect after session is confirmed ─────────────────────────
   useEffect(() => {
@@ -110,6 +123,7 @@ export function useChat() {
           if (prev.some((m) => m.id === incoming.id)) return prev;
           return [...prev, incoming];
         });
+        refreshStats();
       },
     );
 
@@ -117,7 +131,7 @@ export function useChat() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [user]);
+  }, [user, refreshStats]);
 
   // ── Auto-scroll to bottom when new messages arrive ─────────────────────────
   useEffect(() => {
@@ -136,7 +150,7 @@ export function useChat() {
     setLoadingOlder(true);
     loadingOlderRef.current = true;
 
-    getMessages({ limit: 50, before: cursor })
+    getMessages({ before: cursor })
       .then((page) => {
         setMessages((m) => [...page.messages, ...m]);
         setNextCursor(page.nextCursor);
@@ -180,15 +194,19 @@ export function useChat() {
 
   // ── Send ───────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async (content: string) => {
-    if (!user) return;
+    if (!user || isCapReached) return;
     setError(null);
     atBottomRef.current = true;
     try {
       await sendMessage(content);
+      refreshStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to send message.");
+      if (err instanceof Error && err.message.toLowerCase().includes('limit reached')) {
+        refreshStats(); // aggressively force update if the server just blocked us
+      }
     }
-  }, [user]);
+  }, [user, isCapReached, refreshStats]);
 
   // ── Logout ─────────────────────────────────────────────────────────────────
   const handleLogout = useCallback(async () => {
@@ -200,10 +218,11 @@ export function useChat() {
   const handleReset = useCallback(async () => {
     setMessages([]);
     setNextCursor(null);
-    const page = await getMessages({ limit: 50 });
+    const page = await getMessages();
     setMessages(page.messages);
     setNextCursor(page.nextCursor);
-  }, []);
+    refreshStats();
+  }, [refreshStats]);
 
   return {
     user,
@@ -214,6 +233,7 @@ export function useChat() {
     loadingOlder,
     error,
     connected,
+    isCapReached,
     scrollRef,
     topSentinelRef,
     onScroll,

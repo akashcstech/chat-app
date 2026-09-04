@@ -5,8 +5,9 @@ import { sendMessageSchema, getMessagesQuerySchema, objectIdSchema } from '../ut
 import { sanitizeMessageContent } from '../utils/sanitize';
 import { HttpError } from '../middleware/errorHandler';
 import { getOtherUser } from '../services/users';
-import { recordMessageAndMaybeTrim } from '../services/retention';
+import { recordMessageCount } from '../services/retention';
 import { emitMessageCreated } from '../websocket/events';
+import { Meta, MESSAGE_COUNTER_KEY } from '../models/Meta';
 
 /**
  * GET /api/messages?limit=50&before=<messageId>
@@ -24,7 +25,7 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
     const { limit, before } = parsed.data;
 
     const currentUserId = req.session.userId as string;
-    const otherUser = await getOtherUser(currentUserId);
+    const otherUser = await getOtherUser(currentUserId, req.session);
 
     const pairFilter = {
       $or: [
@@ -90,7 +91,17 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
     }
 
     const currentUserId = req.session.userId as string;
-    const otherUser = await getOtherUser(currentUserId);
+    const otherUser = await getOtherUser(currentUserId, req.session);
+
+    // Enforce the hard message cap. No new messages are allowed until the admin
+    // exports and resets the database.
+    const maxMessages = Number(process.env.MAX_MESSAGES) || 5_000_000;
+    const meta = await Meta.findOne({ key: MESSAGE_COUNTER_KEY }).lean();
+    const currentCount = meta?.messageCount || 0;
+
+    if (currentCount >= maxMessages) {
+      throw new HttpError(403, 'Message limit reached. Please ask the administrator to export and reset the database.');
+    }
 
     const created = await Message.create({
       senderId: currentUserId,
@@ -101,7 +112,7 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
     // Fire-and-forget-ish: retention bookkeeping shouldn't block the
     // response, but we still await it here to keep the counter accurate
     // under test/low scale. At real scale this could be queued instead.
-    await recordMessageAndMaybeTrim();
+    await recordMessageCount();
 
     emitMessageCreated(created);
 

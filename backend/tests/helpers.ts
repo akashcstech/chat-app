@@ -1,4 +1,3 @@
-import http from 'http';
 import express, { RequestHandler } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -72,9 +71,4 @@ export async function loginAs(
   const res = await agent.post('/api/auth/login').send({ email, password });
   if (res.status !== 200) throw new Error(`Login failed for ${email}: ${JSON.stringify(res.body)}`);
   return res.body.csrfToken as string;
-}
-
-export function makeHttpServer() {
-  const app = buildTestApp();
-  return http.createServer(app);
 }

@@ -11,7 +11,7 @@ export const MessageBubble = memo(function MessageBubble({
   mine: boolean;
 }) {
   return (
-    <div className={cn("flex w-full", mine ? "justify-end" : "justify-start")}>
+    <div className={cn("flex w-full animate-message-pop", mine ? "justify-end" : "justify-start")}>
       <div
         className={cn(
           "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm sm:max-w-[65%] select-none",

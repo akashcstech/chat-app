@@ -9,12 +9,14 @@ interface Props {
   currentUser: ChatUser;
   /** Callback fired after a successful export+reset so the chat can refresh. */
   onReset?: () => void;
+  /** When this value changes, the counter is re-fetched immediately. Pass messages.length. */
+  refreshKey?: number;
 }
 
 const POLL_INTERVAL_MS = 15_000; // refresh counter every 15 s
 const WARN_THRESHOLD = 0.8; // show warning colour above 80 %
 
-export function DbCapacityBar({ currentUser, onReset }: Props) {
+export function DbCapacityBar({ currentUser, onReset, refreshKey }: Props) {
   const [count, setCount] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportDone, setExportDone] = useState(false);
@@ -51,6 +53,13 @@ export function DbCapacityBar({ currentUser, onReset }: Props) {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [fetchStats]);
+
+  // Instant refresh whenever the parent signals a change (new message sent/received).
+  useEffect(() => {
+    if (refreshKey !== undefined) {
+      fetchStats();
+    }
+  }, [refreshKey, fetchStats]);
 
   const ratio = count !== null ? Math.min(count / MESSAGE_CAP, 1) : 0;
   const pct = Math.round(ratio * 100);

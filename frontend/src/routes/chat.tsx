@@ -39,6 +39,7 @@ function ChatPage() {
     handleSend,
     handleLogout,
     handleReset,
+    isCapReached,
   } = useChat();
 
   if (loading || !user) {
@@ -90,7 +91,7 @@ function ChatPage() {
       </header>
 
       {/* Capacity Bar */}
-      <DbCapacityBar currentUser={user} onReset={handleReset} />
+      <DbCapacityBar currentUser={user} onReset={handleReset} refreshKey={messages.length} />
 
       {/* Message list */}
       <div
@@ -149,7 +150,7 @@ function ChatPage() {
       )}
 
       {/* Input */}
-      <MessageInput onSend={handleSend} />
+      <MessageInput onSend={handleSend} isCapReached={isCapReached} />
     </div>
   );
 }
